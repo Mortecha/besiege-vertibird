@@ -6,56 +6,24 @@
 -- of the components can change. This should shield the script from this as only 
 -- the ID's will need to be changed here and not throughout the entire script. 
 
---------------------
--- Gyroscope
---------------------
--- front
-local fGyroWheelA = 108
-local fGyroWheelB = 109
-local fGyroWheelC = 110
-local fGyroWheelD = 111
-local fGyroWheelE = 112
-
--- center
-local cGyroWheelA = 105
-local cGyroWheelB = 104
-local cGyroWheelC = 103
-local cGyroWheelD = 102
-local cGyroWheelE = 101
-local cGyroWheelF = 100
-
--- back
-local bGyroWheelA = 117
-local bGyroWheelB = 116
-local bGyroWheelC = 115
-local bGyroWheelD = 114
-local bGyroWheelE = 113
-
--- left
-local lGyroWheelA = 123
-local lGyroWheelB = 124
-local lGyroWheelC = 125
-local lGyroWheelD = 126
-local lGyroWheelE = 127
-
--- right
-local rGyroWheelA = 122
-local rGyroWheelB = 121
-local rGyroWheelC = 120
-local rGyroWheelD = 119
-local rGyroWheelE = 118
+------------------------------
+-- Gyroscope Component IDs
+------------------------------
+local rollGyro = {107, 108, 109, 110, 111, 116, 115, 114, 113, 112}
+local yawGyro = {104, 103, 102, 101, 100, 99, 165, 164}
+local pitchGyro = {122, 123, 124, 125, 126, 121, 120, 119, 118, 117}
 
 -- points
-local fGyroPt = 107
-local cTGyroPt = 128 
-local cBGyroPt = 99
-local bGyroPt = 106
+local fGyroPt = 106
+local cTGyroPt = 127 
+local cBGyroPt = 0
+local bGyroPt = 105
 local lGyroPt = 97
 local rGyroPt = 27
 
---------------------
--- Left Engine
---------------------
+------------------------------
+-- Left Engine Component IDs
+------------------------------
 local lTEngSBlock = 52
 local lTEngSBlade = 54
 local lTEngWheel = 50
@@ -63,9 +31,9 @@ local lBEngWheel = 56
 local lBEngSBlade = 61
 local lBEngSBlock = 59
 
---------------------
--- Right Engine
---------------------
+------------------------------
+-- Right Engine Component IDs
+------------------------------
 local rTEngSBlock = 51
 local rTEngSBlade = 53
 local rTEngWheel = 49
@@ -73,11 +41,14 @@ local rBEngWheel = 57
 local rBEngSBlade = 60
 local rBEngSBlock = 58
 
+--------------------------------------------------------------------------------
+
 besiege.setSliderValue(lTEngSBlade, 0) -- left top sawblade
 besiege.setSliderValue(lBEngSBlade, 0) -- left bottom sawblade
 besiege.setSliderValue(rTEngSBlade, 0) -- right top sawblade
 besiege.setSliderValue(rBEngSBlade, 0) -- right bottom sawblade
 
+local engInitLog = false
 local engStart = false
 local engStartComplete = false
 
@@ -131,16 +102,20 @@ besiege.onKeyDown = function(keyCode)
 			engStart = false
 		end
 	end
+end
 
+besiege.onKeyHeld = function(keyCode)
 	if keyCode == besiege.keyCodes.keypadPlus then
 		if plannedAlt < maxAlt then
-			plannedAlt = plannedAlt + 1
+			plannedAlt = plannedAlt + 10
+			besiege.log("Ascending to: " .. plannedAlt .. " units")
 		end
-	end
+	end 
 
 	if keyCode == besiege.keyCodes.keypadMinus then
 		if plannedAlt >= 1 then
-			plannedAlt = plannedAlt - 1
+			plannedAlt = plannedAlt - 10
+			besiege.log("Descending to: " .. plannedAlt .. " units")
 		end
 	end
 end
@@ -148,83 +123,60 @@ end
 besiege.onUpdate = function()
 	if engStart == true then
 		if engStartComplete == false then
+			if engInitLog == false then
+				engInitLog = true
+				besiege.log("Starting engines - Beginning start sequence")
+			end
 			startEngines()
 		end
 	end
 
 	if besiege.getRoll(lGyroPt, rGyroPt) > 5 then
-		adjRoll(2)
-		-- besiege.log("Roll: " .. besiege.getRoll(lGyroPt, rGyroPt) .. " -- Positive?")
+		adjAxis(rollGyro, 2)
 	elseif besiege.getRoll(lGyroPt, rGyroPt) < -5 then
-		adjRoll(-2)
-		-- besiege.log("roll: " .. besiege.getRoll(lGyroPt, rGyroPt) .. " -- Negative?")
+		adjAxis(rollGyro, -2)
 	else
-		adjRoll(0)
+		adjAxis(rollGyro, 0)
 	end
 
 	if besiege.getPitch(fGyroPt, bGyroPt) > 5 then
-		adjPitch(2)
+		adjAxis(pitchGyro, 2)
 
 	elseif besiege.getPitch(fGyroPt, bGyroPt) < -5 then
-		adjPitch(-2)
+		adjAxis(pitchGyro, -2)
 	else
-		adjPitch(0)
+		adjAxis(pitchGyro, 0)
 	end
 
-	if (besiege.getPositionY(0) < plannedAlt) then
+	if besiege.getPositionY(0) < plannedAlt then
 		increaseThrust()
-	end 
-
-	if (besiege.getPositionY(0) > plannedAlt) then
+	elseif besiege.getPositionY(0) > plannedAlt then
 		decreaseThrust()
 	end
 end
 
 function startEngines()
-	increaseComponentSpeed(lTEngWheel, lBEngWheel, lEngWheelSpeed, engWheelIdleSpeed, .001, lEngWheelIdling)
-	increaseComponentSpeed(lTEngSBlade, lBEngSBlade, lEngSBladeSpeed, engSBladeIdleSpeed, .001, lEngSBladeIdling)
-	increaseComponentSpeed(lTEngSBlock, lBEngSBlock, lEngSBlockSpeed, engSBlockIdleSpeed, .001, lEngSBlockIdling)
+	increaseComponentSpeed(lTEngWheel, lBEngWheel, lEngWheelSpeed, engWheelIdleSpeed, .004, lEngWheelIdling)
+	increaseComponentSpeed(lTEngSBlade, lBEngSBlade, lEngSBladeSpeed, engSBladeIdleSpeed, .004, lEngSBladeIdling)
+	increaseComponentSpeed(lTEngSBlock, lBEngSBlock, lEngSBlockSpeed, engSBlockIdleSpeed, .004, lEngSBlockIdling)
 
-	increaseComponentSpeed(rTEngWheel, rBEngWheel, rEngWheelSpeed, engWheelIdleSpeed, .001, rEngWheelIdling)
-	increaseComponentSpeed(rTEngSBlade, rBEngSBlade, rEngSBladeSpeed, engSBladeIdleSpeed, .001, rEngSBladeIdling)
-	increaseComponentSpeed(rTEngSBlock, rBEngSBlock, rEngSBlockSpeed, engSBlockIdleSpeed, .001, rEngSBlockIdling)
+	increaseComponentSpeed(rTEngWheel, rBEngWheel, rEngWheelSpeed, engWheelIdleSpeed, .004, rEngWheelIdling)
+	increaseComponentSpeed(rTEngSBlade, rBEngSBlade, rEngSBladeSpeed, engSBladeIdleSpeed, .004, rEngSBladeIdling)
+	increaseComponentSpeed(rTEngSBlock, rBEngSBlock, rEngSBlockSpeed, engSBlockIdleSpeed, .004, rEngSBlockIdling)
 
 	if lEngWheelIdling[1] and lEngSBladeIdling[1] and lEngSBlockIdling[1] then
 		if rEngWheelIdling[1] and rEngSBladeIdling[1] and rEngSBlockIdling[1] then
 			engStartComplete = true
+			besiege.log("Engines idling - Start sequence complete")
 		end 
 	end 
 end
 
--- negative speed rolls right
--- positive speed rolls left
-function adjRoll(speed)
-	besiege.setSliderValue(fGyroWheelA, speed)
-	besiege.setSliderValue(fGyroWheelB, speed)
-	besiege.setSliderValue(fGyroWheelC, speed)
-	besiege.setSliderValue(fGyroWheelD, speed)
-	besiege.setSliderValue(fGyroWheelE, speed)
-	besiege.setSliderValue(bGyroWheelA, speed)
-	besiege.setSliderValue(bGyroWheelB, speed)
-	besiege.setSliderValue(bGyroWheelC, speed)
-	besiege.setSliderValue(bGyroWheelD, speed)
-	besiege.setSliderValue(bGyroWheelE, speed)
+function adjAxis(gyro, speed)
+	for i, v in pairs(gyro) do
+		besiege.setSliderValue(v, speed)
+	end
 end
-
--- negative speed increases pitch angle
--- positive speed decreases pitch angle
-function adjPitch(speed)
-	besiege.setSliderValue(lGyroWheelA, speed)
-	besiege.setSliderValue(lGyroWheelB, speed)
-	besiege.setSliderValue(lGyroWheelC, speed)
-	besiege.setSliderValue(lGyroWheelD, speed)
-	besiege.setSliderValue(lGyroWheelE, speed)
-	besiege.setSliderValue(rGyroWheelA, speed)
-	besiege.setSliderValue(rGyroWheelB, speed)
-	besiege.setSliderValue(rGyroWheelC, speed)
-	besiege.setSliderValue(rGyroWheelD, speed)
-	besiege.setSliderValue(rGyroWheelE, speed)
-end 
 
 function increaseThrust()
 	if engStartComplete == true then
