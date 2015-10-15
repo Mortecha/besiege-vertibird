@@ -38,9 +38,9 @@ function TorqueGenerator:update()
 		self.rotate(self.c[1], 0)
 	end
 
-	if self.latVal > 5 then
+	if self.latVal > 2 then
 		self.rotate(self.c[2], 2)
-	elseif self.latVal < -5 then
+	elseif self.latVal < -2 then
 		self.rotate(self.c[2], -2)
 	else
 		self.rotate(self.c[2], 0)
@@ -133,65 +133,36 @@ local tG = TorqueGenerator(tGenComponents)
 local lEng = Engine(lEngineComponents)
 local rEng = Engine(rEngineComponents)
 
+local idleThrustPercent = 20
+local incAltThrustPercent = 50
+local decAltThrustPercent = 20
 local lEngThrustPercent = 0
 local rEngThrustPercent = 0
 local targetAlt = 0
-
-local enginesActivateLog = false
-local enginesDeactivateLog = false
-local enginesIdleLog = false
 
 function enginesInactive()
 	besiege.log("Engines inactive")
 end
 
 function activateEngines()
-	local idleThrustPercentage = 20
-	enginesDeactivateLog = false
-
-	if enginesActivateLog == false then
-		enginesActivateLog = true
-		besiege.log("Engines activated")	
-	end
-
-	if lEngThrustPercent < idleThrustPercentage then
+	if lEngThrustPercent < idleThrustPercent then
 		lEng:adjThrustTo(rEngThrustPercent + 0.2)
 		lEngThrustPercent = lEngThrustPercent + 0.2
-		if(lEngThrustPercent > idleThrustPercentage) then
-			lEngThrustPercent = idleThrustPercentage
+		if(lEngThrustPercent > idleThrustPercent) then
+			lEngThrustPercent = idleThrustPercent
 		end
 	end
 
-	if rEngThrustPercent < idleThrustPercentage then
+	if rEngThrustPercent < idleThrustPercent then
 		rEng:adjThrustTo(rEngThrustPercent + 0.2)
 		rEngThrustPercent = rEngThrustPercent + 0.2
-		if(rEngThrustPercent > idleThrustPercentage) then
-			rEngThrustPercent = idleThrustPercentage
+		if(rEngThrustPercent > idleThrustPercent) then
+			rEngThrustPercent = idleThrustPercent
 		end
-	end
-
-	-- if idling speed reached by both engines
-	if(lEngThrustPercent == idleThrustPercentage and rEngThrustPercent == idleThrustPercentage) then
-		changeState("activatingEngines", "engineActivationComplete")
-		enginesActivateLog = false
-	end
-end
-
-function idling()
-	if enginesIdleLog == false then
-		enginesIdleLog = true
-		besiege.log("Engines Idling")	
 	end
 end
 
 function deactivateEngines()
-	enginesActivateLog = false
-	enginesIdleLog = false
-	if enginesDeactivateLog == false then
-		enginesDeactivateLog = true
-		besiege.log("Engines deactivating")	
-	end
-	
 	if lEngThrustPercent > 0 then
 		lEng:adjThrustTo(rEngThrustPercent - 0.2)
 		lEngThrustPercent = lEngThrustPercent - 0.2
@@ -207,75 +178,33 @@ function deactivateEngines()
 			rEngThrustPercent = 0
 		end
 	end
-	
-	if(lEngThrustPercent == 0 and rEngThrustPercent == 0) then
-		changeState("inactive", "enginesDeactivated")
-		enginesDeactivateLog = false
+end
+
+function idling()
+
+end
+
+-- will be updated with a logistic algorithm
+function increaseAltitude()
+	if lEngThrustPercent < incAltThrustPercent then
+		lEng:adjThrustTo(lEngThrustPercent + 0.2)
+		lEngThrustPercent = lEngThrustPercent + 0.2
 	end
-end
-
-function ascFromIdle()
-	-- allows for retraction of landing gear once script lib allows for piston control 
-	-- increase altitude directly from here
-
-	if enginesIdleLog == false then
-		enginesIdleLog = true
-		besiege.log("Activating engines")	
+	if rEngThrustPercent < incAltThrustPercent then
+		rEng:adjThrustTo(rEngThrustPercent + 0.2)
+		rEngThrustPercent = rEngThrustPercent + 0.2
 	end
-	--transitionAltTo(targetAlt)
-end
+end 
 
-function hover()
-	besiege.log("Hovering")
-end
-
-function dscFromAsc()
-	besiege.log("Descending from ascending")
-end
-
-function ascFromHover()
-	besiege.log("Ascending after hover")
-end
-
-function dscFromHover()
-	besiege.log("Descending after hover")
-end
-
-function ascFromDsc()
-	besiege.log("Ascending from Descending")
-end
-
-function hoverFromDsc()
-	besiege.log("Hovering after descent")
-end
-
-function land()
-	besiege.log("Landing")
-end
-
-function idleFromLanding()
-	besiege.log("Idling after landing")
-end
-
-function transitionAltTo(val)
-	if besiege.getPositionY(0) < targetAlt then
-		if lEngThrustPercent < 50 then
-			lEng:adjThrustTo(lEngThrustPercent + 0.2)
-			lEngThrustPercent = lEngThrustPercent + 0.2
-		end
-		if rEngThrustPercent < 50 then
-			rEng:adjThrustTo(rEngThrustPercent + 0.2)
-			rEngThrustPercent = rEngThrustPercent + 0.2
-		end
-	else -- besiege.getPositionY(0) > targetAlt implied
-		if lEngThrustPercent > 20 then
-			lEng:adjThrustTo(lEngThrustPercent - 0.2)
-			lEngThrustPercent = lEngThrustPercent - 0.2
-		end
-		if rEngThrustPercent > 20 then
-			rEng:adjThrustTo(rEngThrustPercent - 0.2)
-			rEngThrustPercent = rEngThrustPercent - 0.2
-		end
+-- will be updated with a logistic algorithm
+function decreaseAltitude()
+	if lEngThrustPercent > decAltThrustPercent then
+		lEng:adjThrustTo(lEngThrustPercent - 0.4)
+		lEngThrustPercent = lEngThrustPercent - 0.4
+	end
+	if rEngThrustPercent > decAltThrustPercent then
+		rEng:adjThrustTo(rEngThrustPercent - 0.4)
+		rEngThrustPercent = rEngThrustPercent - 0.4
 	end
 end
 
@@ -291,31 +220,18 @@ function FSM(t)
 	return a
 end
 
-
 fsm = FSM
 {
 	{"inactive", "enginesDeactivated", "inactive", enginesInactive}, -- start state
 	{"inactive", "enginesActivationBegin", "activatingEngines", activateEngines},
 	{"activatingEngines", "enginesDeactivatedDuringActivation", "deactivatingEngines", deactivateEngines},
-	{"deactivatingEngines", "enginesActivatedDuringDeactivation", "activatingEngines", activateEngines},
 	{"activatingEngines", "engineActivationComplete", "idle", idling},
+	{"deactivatingEngines", "enginesActivatedDuringDeactivation", "activatingEngines", activateEngines},
 	{"idle", "engineDeactivatedDuringIdle", "deactivatingEngines", deactivateEngines},
-
-
-	--{"deactivatingEngines", "engineShutdownComplete", "inactive", enginesInactive},
-	--{"deactivatingEngines", "enginePoweringUpFromShutdown", "activatingEngines", activateEngines},
-	--{"idle", "stopEnginesFromIdle", "deactivatingEngines", deactivateEngines},
-
-
---	{"idle", "altRaisedFromIdle", "ascend", ascFromIdle},
---	{"ascend", "altReachedFromIdle", "hover", hover},
---	{"ascend", "altLoweredFromAscent", "descend", dscFromAsc},
---	{"hover", "altRaisedFromHover", "ascend", ascFromHover},
---	{"hover", "altLoweredFromHover", "descend", dscFromHover},
---	{"descend", "altRaisedFromDescent", "ascend", ascFromDsc},
---	{"descend", "altReachedFromDescent", "hover", hover},
---	{"descend", "altLoweredToZero", "landing", land},
---	{"landing", "altReachedForLanding", "idle", idleFromLanding},
+	{"idle", "targetAltitudeSetAboveCurrentAltitude", "increaseAltitude", increaseAltitude},
+	{"increaseAltitude", "targetAltitudeBelowCurrentAltitude", "decreaseAltitude", decreaseAltitude},
+	{"decreaseAltitude", "targetAltitudeAboveCurrentAltitude", "increaseAltitude", increaseAltitude},
+	{"decreaseAltitude", "targetAltZeroAndVertibirdLanded", "idle", idling}
 }
 
 local a = fsm["inactive"]["enginesDeactivated"]
@@ -339,6 +255,7 @@ end
 besiege.onKeyHeld = function(keyCode)
 	if keyCode == besiege.keyCodes.keypadPlus then
 		targetAlt = targetAlt + 5
+		besiege.log("Target altitude: " .. targetAlt)
 	end 
 
 	if keyCode == besiege.keyCodes.keypadMinus then
@@ -346,23 +263,79 @@ besiege.onKeyHeld = function(keyCode)
 		if targetAlt < 0 then
 			targetAlt = 0
 		end
+		besiege.log("Target altitude: " .. targetAlt)
 	end
 end
+
+local activationLog = {false}
+local deactivationLog = {false}
+local idleLog = {false}
+local increaseAltitudeLog = {false}
+local decreaseAltitudeLog = {false}
 
 besiege.onUpdate = function()
 	tG:update()
-
-	if state == "activatingEngines" then
+	if state == "activatingEngines" then		
+		logStatus(activationLog, "Engines activated")
+		deactivationLog[1] = false
 		activateEngines()
+		if(lEngThrustPercent == idleThrustPercent and rEngThrustPercent == idleThrustPercent) then
+			changeState("activatingEngines", "engineActivationComplete")
+		end
+
 	elseif state == "deactivatingEngines" then
+		logStatus(deactivationLog, "Engines deactivated")
+		activationLog[1] = false
+		idleLog[1] = false
 		deactivateEngines()
+
+		if(lEngThrustPercent == 0 and rEngThrustPercent == 0) then
+			changeState("inactive", "enginesDeactivated")
+		end
+
+	elseif state == "idle" then
+		logStatus(idleLog, "Engines idling")
+		activationLog[1] = false
+		decreaseAltitudeLog[1] = false
+		idling()
+
+		if targetAlt > 0 then
+			changeState("idle", "targetAltitudeSetAboveCurrentAltitude")
+		end
+
+	elseif state == "increaseAltitude" then
+		logStatus(increaseAltitudeLog, "Increasing altitude")
+		idleLog[1] = false
+		decreaseAltitudeLog[1] = false
+		increaseAltitude()
+
+		if targetAlt < besiege.getPositionY(0) then
+			changeState("increaseAltitude", "targetAltitudeBelowCurrentAltitude")
+		end
+
+	elseif state == "decreaseAltitude" then
+		logStatus(decreaseAltitudeLog, "Decreasing altitude")
+		increaseAltitudeLog[1] = false
+		decreaseAltitude()
+		
+		if targetAlt == 0 and besiege.getPositionY(0) < 3 then
+			changeState("decreaseAltitude", "targetAltZeroAndVertibirdLanded")
+		end
+		if targetAlt > besiege.getPositionY(0) then
+			changeState("decreaseAltitude", "targetAltitudeAboveCurrentAltitude")
+		end
 	end
-
 end
-
 
 function changeState(oldState, event)
 	a = fsm[oldState][event]
 	a.action()
 	state = a.new
+end
+
+function logStatus(log, msg)
+	if log[1] == false then
+		log[1] = true
+		besiege.log(msg)
+	end
 end
