@@ -38,9 +38,9 @@ function TorqueGenerator:update()
 		self.rotate(self.c[1], 0)
 	end
 
-	if self.latVal > 2 then
+	if self.latVal > 5 then
 		self.rotate(self.c[2], 2)
-	elseif self.latVal < -2 then
+	elseif self.latVal < -5 then
 		self.rotate(self.c[2], -2)
 	else
 		self.rotate(self.c[2], 0)
@@ -62,20 +62,60 @@ setmetatable(Engine, {
 function Engine.new(c)
 	local self = setmetatable({}, Engine)
 	self.c = c -- engine components
+	self.thrustPercent = 0
+	self.idleThrustPercent = 20
+	self.raiseAltThrustPercent = 50
+	self.lowerAltThrustPercent = 20
+
+	function Engine:adjThrustTo(val)
+		for i, v in pairs(self.c) do
+			v[2] = v[3] / 100 * val
+			besiege.setSliderValue(v[1], v[2])
+		end
+	end
+
 	return self
 end
 
-function Engine:adjThrustTo(val)
-	for i, v in pairs(self.c) do
-		v[2] = v[3] / 100 * val
-		besiege.setSliderValue(v[1], v[2])
+function Engine:getThrust()
+	return self.thrustPercent
+end
+
+function Engine:activate()
+	if self.thrustPercent < self.idleThrustPercent then
+		self:adjThrustTo(self.thrustPercent + 0.2)
+		self.thrustPercent = self.thrustPercent + 0.2
+		if(self.thrustPercent > self.idleThrustPercent) then
+			self.thrustPercent = self.idleThrustPercent
+		end
 	end
 end
 
---------------------------------------------------------------------------------
- -- Flight control state machine
---------------------------------------------------------------------------------
+function Engine:deactivate()
+	if self.thrustPercent > 0 then
+		self:adjThrustTo(self.thrustPercent - 0.2)
+		self.thrustPercent = self.thrustPercent - 0.2
+		if(self.thrustPercent < 0) then
+			self.thrustPercent = 0
+		end
+	end
+end
 
+-- will be updated with a logistic algorithm
+function Engine:increaseAltitude()
+	if self.thrustPercent < self.raiseAltThrustPercent then
+		self:adjThrustTo(self.thrustPercent + 0.2)
+		self.thrustPercent = self.thrustPercent + 0.2
+	end
+end
+
+-- will be updated with a logistic algorithm
+function Engine:decreaseAltitude()
+	if self.thrustPercent > self.lowerAltThrustPercent then
+		self:adjThrustTo(self.thrustPercent - 0.4)
+		self.thrustPercent = self.thrustPercent - 0.4
+	end
+end
 
 --------------------------------------------------------------------------------
 -- Torque Gen Component IDs
@@ -133,11 +173,6 @@ local tG = TorqueGenerator(tGenComponents)
 local lEng = Engine(lEngineComponents)
 local rEng = Engine(rEngineComponents)
 
-local idleThrustPercent = 20
-local incAltThrustPercent = 50
-local decAltThrustPercent = 20
-local lEngThrustPercent = 0
-local rEngThrustPercent = 0
 local targetAlt = 0
 
 function enginesInactive()
@@ -145,67 +180,25 @@ function enginesInactive()
 end
 
 function activateEngines()
-	if lEngThrustPercent < idleThrustPercent then
-		lEng:adjThrustTo(rEngThrustPercent + 0.2)
-		lEngThrustPercent = lEngThrustPercent + 0.2
-		if(lEngThrustPercent > idleThrustPercent) then
-			lEngThrustPercent = idleThrustPercent
-		end
-	end
-
-	if rEngThrustPercent < idleThrustPercent then
-		rEng:adjThrustTo(rEngThrustPercent + 0.2)
-		rEngThrustPercent = rEngThrustPercent + 0.2
-		if(rEngThrustPercent > idleThrustPercent) then
-			rEngThrustPercent = idleThrustPercent
-		end
-	end
+	lEng:activate()
+	rEng:activate()
 end
 
 function deactivateEngines()
-	if lEngThrustPercent > 0 then
-		lEng:adjThrustTo(rEngThrustPercent - 0.2)
-		lEngThrustPercent = lEngThrustPercent - 0.2
-		if(lEngThrustPercent < 0) then
-			lEngThrustPercent = 0
-		end
-	end
-	
-	if rEngThrustPercent > 0 then
-		rEng:adjThrustTo(rEngThrustPercent - 0.2)
-		rEngThrustPercent = rEngThrustPercent - 0.2
-		if(rEngThrustPercent < 0) then
-			rEngThrustPercent = 0
-		end
-	end
+	lEng:deactivate()
+	rEng:deactivate()
 end
 
-function idling()
+function idling() end
 
-end
-
--- will be updated with a logistic algorithm
 function increaseAltitude()
-	if lEngThrustPercent < incAltThrustPercent then
-		lEng:adjThrustTo(lEngThrustPercent + 0.2)
-		lEngThrustPercent = lEngThrustPercent + 0.2
-	end
-	if rEngThrustPercent < incAltThrustPercent then
-		rEng:adjThrustTo(rEngThrustPercent + 0.2)
-		rEngThrustPercent = rEngThrustPercent + 0.2
-	end
+	lEng:increaseAltitude()
+	rEng:increaseAltitude()
 end 
 
--- will be updated with a logistic algorithm
 function decreaseAltitude()
-	if lEngThrustPercent > decAltThrustPercent then
-		lEng:adjThrustTo(lEngThrustPercent - 0.4)
-		lEngThrustPercent = lEngThrustPercent - 0.4
-	end
-	if rEngThrustPercent > decAltThrustPercent then
-		rEng:adjThrustTo(rEngThrustPercent - 0.4)
-		rEngThrustPercent = rEngThrustPercent - 0.4
-	end
+	lEng:decreaseAltitude()
+	rEng:decreaseAltitude()
 end
 
 function FSM(t)
@@ -279,7 +272,7 @@ besiege.onUpdate = function()
 		logStatus(activationLog, "Engines activated")
 		deactivationLog[1] = false
 		activateEngines()
-		if(lEngThrustPercent == idleThrustPercent and rEngThrustPercent == idleThrustPercent) then
+		if(lEng:getThrust() == idleThrustPercent and rEng:getThrust() == idleThrustPercent) then
 			changeState("activatingEngines", "engineActivationComplete")
 		end
 
@@ -289,7 +282,7 @@ besiege.onUpdate = function()
 		idleLog[1] = false
 		deactivateEngines()
 
-		if(lEngThrustPercent == 0 and rEngThrustPercent == 0) then
+		if(lEng:getThrust() == 0 and rEng:getThrust() == 0) then
 			changeState("inactive", "enginesDeactivated")
 		end
 
@@ -317,7 +310,7 @@ besiege.onUpdate = function()
 		logStatus(decreaseAltitudeLog, "Decreasing altitude")
 		increaseAltitudeLog[1] = false
 		decreaseAltitude()
-		
+
 		if targetAlt == 0 and besiege.getPositionY(0) < 3 then
 			changeState("decreaseAltitude", "targetAltZeroAndVertibirdLanded")
 		end
