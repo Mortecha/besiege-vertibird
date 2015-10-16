@@ -81,6 +81,10 @@ function Engine:getThrust()
 	return self.thrustPercent
 end
 
+function Engine:getIdleThrustPercent()
+	return self.idleThrustPercent
+end
+
 function Engine:activate()
 	if self.thrustPercent < self.idleThrustPercent then
 		self:adjThrustTo(self.thrustPercent + 0.2)
@@ -272,7 +276,7 @@ besiege.onUpdate = function()
 		logStatus(activationLog, "Engines activated")
 		deactivationLog[1] = false
 		activateEngines()
-		if(lEng:getThrust() == idleThrustPercent and rEng:getThrust() == idleThrustPercent) then
+		if lEng:getThrust() == lEng:getIdleThrustPercent() and rEng:getThrust() == rEng:getIdleThrustPercent() then
 			changeState("activatingEngines", "engineActivationComplete")
 		end
 
@@ -282,7 +286,7 @@ besiege.onUpdate = function()
 		idleLog[1] = false
 		deactivateEngines()
 
-		if(lEng:getThrust() == 0 and rEng:getThrust() == 0) then
+		if lEng:getThrust() == 0 and rEng:getThrust() == 0 then
 			changeState("inactive", "enginesDeactivated")
 		end
 
